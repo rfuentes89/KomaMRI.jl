@@ -24,19 +24,19 @@ Tfatsat = 26.624e-3     # 26.6 [ms]
 T2prep_duration = 50e-3 # 50 [ms]
 
 # Acquisition
-RR = 0.9 				# 1 [s]
+RR = 1.0 				# 1 [s]
 dummy_heart_beats = 3 	# Steady-state
-TR = 6.14e-3             # 5.3 [ms] RF Low SAR
+TR = 7.14e-3             # 5.3 [ms] RF Low SAR
 TE = TR / 2 			# bSSFP condition
-iNAV_lines = 3          # FatSat-Acq delay: iNAV_lines * TR
+iNAV_lines = 3          # FatSat-Acq delay: iNAV_lines * TR (reduced from 3)
 iNAV_flip_angle = 3.2   # 3.2 [deg]
-im_segments = 30        # Acquisitino window: im_segments * TR
+im_segments = 30        # Acquisitino window: im_segments * TR (reduced from 30)
 
 # To be optimized
 im_flip_angle = [155, 90] # 80 [deg]
 FatSat_flip_angle = 180   # 180 [deg]
 IR_inversion_time = 90e-3 # 90 [ms] 
-#t2p_50 = read_seq("examples/4.reproducible_notebooks/t2_adiab_50.seq")
+#t2p_50 = read_seq("examples/4.reproducible_notebooks/boost_055T_basico.seq")
 #t2p_50 = read_seq("examples/4.reproducible_notebooks/adiabatic_t2_50ms.seq")
 #t2p_50 = read_seq("examples/4.reproducible_notebooks/t2_mlev8_50.seq")
 
@@ -161,7 +161,7 @@ function BOOST(
 			im_segments,
 			iNAV_flip_angle,
 			im_flip_angle,
-			T2prep_duration=50e-3,
+			T2prep_duration,
 			#t2p_50,
 			IR_inversion_time=70e-3,
 			FatSat_flip_angle=180,
@@ -387,7 +387,7 @@ end
 
 # ╔═╡ c952ecf1-25ef-4b48-9c8f-e53ded302629
 
-TIs = (40:5:160) # Inversion delay [ms]
+TIs = (40:5:100) # Inversion delay [ms]
 mag3 = zeros(ComplexF64, im_segments, Niso*3, length(TIs), length(Δfs))
 @progress for (m, Δf) = enumerate(Δfs), (n, TI) = enumerate(TIs)
 	seq_params3 = merge(seq_params, (; IR_inversion_time=TI * 1e-3, RR))
@@ -418,7 +418,7 @@ end
 
 # Labels
 labels = ["Carotid", "Blood", "Fat (T₁=183 ms)"]
-colors = ["blue", "red", "green"]
+colors = ["blue", "red", "purple"]
 #spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))', ((3Niso + 1):(4Niso))']
 spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))']
 mean(x, dim) = sum(x; dims=dim) / size(x, dim)

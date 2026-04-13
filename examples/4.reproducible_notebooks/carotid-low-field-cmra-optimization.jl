@@ -2,7 +2,7 @@
 
 using KomaMRICore, KomaMRIPlots, KomaMRIFiles, CUDA, PlotlyJS # Essentials
 
-using Suppressor, ProgressLogging # Extras
+using Suppressor, ProgressLogging, WebIO # Extras
 
 sys = Scanner()
 sys.B0 = 0.55
@@ -19,7 +19,7 @@ Tfatsat = 26.624e-3     # 26.6 [ms]
 T2prep_duration = 50e-3 # 50 [ms]
 
 	# Acquisition
-RR = 0.9 				# 1 [s]
+RR = 0.8 				# 1 [s]
 dummy_heart_beats = 3 	# Steady-state
 TR = 6.27e-3             # 5.3 [ms] RF Low SAR
 TE = TR / 2 			# bSSFP condition
@@ -30,7 +30,7 @@ im_segments = 30        # Acquisitino window: im_segments * TR
 im_flip_angle = 110    # 110 [deg]
 FatSat_flip_angle = 180 # 180 [deg]
 
-#t2p_50 = read_seq("examples/4.reproducible_notebooks/t2_mlev4_50.seq") # Pulseq import
+#t2p_50 = read_seq("examples/4.reproducible_notebooks/boost_055T_basico.seq") # Pulseq import
 
 seq_params = (;
 	dummy_heart_beats,
@@ -127,7 +127,7 @@ function CMRA(
 			#t2p_50,
 			T2prep_duration,
 			FatSat_flip_angle=180,
-			RR=0.9;
+			RR=0.8;
 			sample_recovery=zeros(Bool, dummy_heart_beats+1)
 			)
 	# Seq init
@@ -326,7 +326,7 @@ mag3 = zeros(ComplexF64, im_segments, Niso*3, length(T2ps), length(RRs))
 end
 
 # Labels
-labels = ["Carotid", "Blood", "Fat (T₁=183 ms)"]
+labels = ["Carotid", "Blood", "Fat (T₁=183 ms)", "Blood-Carotid"]
 colors = ["blue", "red", "green", "purple"]
 spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))']
 mean(x, dim) = sum(x; dims=dim) / size(x, dim)
@@ -613,3 +613,91 @@ relayout!(
 	hovermode="x unified",
 )
 fig3
+
+#RR simuations
+begin
+	hbpm = 50:10:100 # Heart rate [bpm]
+    FAs = 20:10:180 		# flip angle [deg]
+	RRs = 60 ./ (hbpm)  # RR [s]
+    mag_1hb = zeros(ComplexF64, im_segments, Niso*3, length(RRs))
+    @progress for (m, RR) = enumerate(RRs)
+		seq_params1 = merge(seq_params, (; RR))
+		sim_params1 = merge(sim_params, Dict("sim_method"=>BlochDict()))
+		seq1        = CMRA(seq_params1...)
+		obj1        = cardiac_phantom(0)
+		magaux = @suppress simulate(obj1, seq1, sys; sim_params=sim_params1)
+		mag_1hb[:, :, m] .= magaux[end-im_segments+1:end, :]
+    end
+end
+
+#Plotting RR results
+begin
+	# Reducing tissues's signal
+	signal_1hb_myoc = reshape(
+	    mean(abs.(mean(mag_1hb[:, spins[1], :, :],3)), 1), length(RRs)
+	)
+	signal_1hb_bloo = reshape(
+	    mean(abs.(mean(mag_1hb[:, spins[2], :, :],3)), 1), length(RRs)
+	)
+	signal_1hb_fat = reshape(
+	    mean(abs.(mean(mag_1hb[:, spins[3], :, :],3)), 1), length(RRs)
+	)
+	signal_1hb_diff = abs.(signal_1hb_myoc .- signal_1hb_bloo)
+
+	# Mean
+	mean_myoc = mean(signal_1hb_myoc, 2)
+	mean_bloo = mean(signal_1hb_bloo, 2)
+	mean_diff = mean(signal_1hb_diff, 2)
+
+	# Plotting results
+	# Mean
+	s1 = scatter(;
+	    x=RRs .* 1000,
+	    y=signal_1hb_myoc[:],
+	    name=labels[1],
+	    legendgroup=labels[1],
+	    line=attr(; color=colors[1]),
+	)
+	s2 = scatter(;
+	    x=RRs .* 1000,
+	    y=signal_1hb_bloo[:],
+	    name=labels[2],
+	    legendgroup=labels[2],
+	    line=attr(; color=colors[2]),
+	)
+	s3 = scatter(;
+		x=RRs .* 1000,
+		y=signal_1hb_diff[:],
+		name="|Blood-Caro|",
+		legendgroup="|Blood-Caro|",
+		line=attr(color=colors[4])
+	)
+	s4 = scatter(;
+		x=RRs .* 1000,
+		y=signal_1hb_fat[:],
+		name=labels[3],
+		legendgroup=labels[3],
+		line=attr(color=colors[3])
+	)
+	
+	# Plots
+	fig = plot([s1, s2, s3, s4])
+	relayout!(
+	    fig;
+	    yaxis=attr(; title="Signal [a.u.]", tickmode="array"),
+	    xaxis=attr(;
+	        #title="Heart rate [bpm]",
+			title="RR [ms]",
+	        tickmode="array",
+	        tickvals=[round(Int, RRs[end] * 1000), 1000, round(Int, RRs[1] * 1000)],
+	        constrain="domain",
+	    ),
+	    font=attr(; family="CMU Serif", size=16, scaleanchor="x", scaleratio=1),
+	    #yaxis_range=[0, 0.3],
+		xaxis_range=[RRs[end]*1000, RRs[1]*1000],
+	    width=600,
+	    height=400,
+	    hovermode="x unified",
+	)
+	fig
+end 
