@@ -24,7 +24,7 @@ Tfatsat = 26.624e-3     # 26.6 [ms]
 T2prep_duration = 50e-3 # 50 [ms]
 
 # Acquisition
-RR = 1.0 				# 1 [s]
+RR = 0.8 				# 1 [s]
 dummy_heart_beats = 3 	# Steady-state
 TR = 7.14e-3             # 5.3 [ms] RF Low SAR
 TE = TR / 2 			# bSSFP condition
@@ -250,7 +250,7 @@ phantom_T1 = plot(
 			colorscale=[
 				[0.0, "black"],
 				[183.0/maximum(obj.T1 .* 1e3), "green"],
-				[750.0/maximum(obj.T1 .* 1e3), "blue"],
+				[450.0/maximum(obj.T1 .* 1e3), "blue"],
 				[1122.0/maximum(obj.T1 .* 1e3), "red"],
 			],
 			cmin=0.0,
@@ -282,7 +282,7 @@ phantom_T2 = plot(
 			color=obj.T2 * 1e3,
 			colorscale=[
 				[0.0, "black"],
-				[58.0/maximum(obj.T2 .* 1e3), "blue"],
+				[54.0/maximum(obj.T2 .* 1e3), "blue"],
 				[93.0/maximum(obj.T2 .* 1e3), "green"],
 				[263.0/maximum(obj.T2 .* 1e3), "red"],
 			],
@@ -310,7 +310,7 @@ relayout!(
 
 # ╔═╡ d9715bc1-49cd-4df8-8dbf-c06de42ad550
     # Prep plots
-labs = ["Carotid", "Blood", "Fat"]
+labs = ["Muscle", "Blood", "Fat"]
 cols = ["blue", "red", "green"]
 spin_group = [(1:Niso)', (Niso+1:2Niso)', (2Niso+1:3Niso)']
 t = KomaMRICore.get_adc_sampling_times(seq)
@@ -417,7 +417,7 @@ mag5rf = zeros(ComplexF64, im_segments, Niso*3, length(T2ps), length(RRs))
 end
 
 # Labels
-labels = ["Carotid", "Blood", "Fat (T₁=183 ms)"]
+labels = ["Muscle", "Blood", "Fat (T₁=183 ms)"]
 colors = ["blue", "red", "purple"]
 #spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))', ((3Niso + 1):(4Niso))']
 spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))']
@@ -461,8 +461,8 @@ s2 = scatter(;
 s3 = scatter(;
 	x=FAs,
 	y=mean_diff[:],
-	name="|Blood-Carotid|",
-	legendgroup="|Blood-Carotid|",
+	name="|Blood-Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
 )
 # Std
@@ -491,7 +491,7 @@ s5 = scatter(;
 s6 = scatter(;
 	x=[FAs; reverse(FAs)],
 	y=[(mean_diff .- std_diff)[:]; reverse((mean_diff .+ std_diff)[:])],
-	name="|Blood-Carotid|",legendgroup="|Blood-Carotid|",
+	name="|Blood-Muscle|",legendgroup="|Blood-Muscle|",
 	showlegend=false,
 	fill="toself",
 	fillcolor="rgba(255,0,255,0.2)",
@@ -672,8 +672,8 @@ s24 = scatter(;
 s34 = scatter(;
 	x=FAs,
 	y=mean_diff4[:],
-	name="|Blood-Carotid|",
-	legendgroup="|Blood-Carotid|",
+	name="|Blood-Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
 )
 # Std
@@ -702,7 +702,7 @@ s54 = scatter(;
 s64 = scatter(;
 	x=[FAs; reverse(FAs)],
 	y=[(mean_diff4 .- std_diff4)[:]; reverse((mean_diff4 .+ std_diff4)[:])],
-	name="|Blood-Carotid|",legendgroup="|Blood-Carotid|",
+	name="|Blood-Muscle|",legendgroup="|Blood-Muscle|",
 	showlegend=false,
 	fill="toself",
 	fillcolor="rgba(255,0,255,0.2)",
@@ -883,8 +883,8 @@ s25 = scatter(;
 s35 = scatter(;
 	x=T2ps,
 	y=mean_diff5[:],
-	name="|Blood-Carotid|",
-	legendgroup="|Blood-Carotid|",
+	name="|Blood-Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
 )
 # Std
@@ -942,55 +942,55 @@ fig5
 
 # ╔═╡ 10e68e25-9f68-46c0-b1b0-e9b124706b67
 # Reducing tissues's signal
-signal_myocbb = reshape(
+#signal_myocbb = reshape(
 	mean(abs.(mean(mag5bb[:, spins[1], :, :], 3)), 1), length(T2ps), length(RRs)
-)
-signal_bloodbb = reshape(
+#)
+#signal_bloodbb = reshape(
 	mean(abs.(mean(mag5bb[:, spins[2], :, :], 3)), 1), length(T2ps), length(RRs)
-)
-signal_myocrf = reshape(
+#)
+#signal_myocrf = reshape(
 	mean(abs.(mean(mag5rf[:, spins[1], :, :], 3)), 1), length(T2ps), length(RRs)
-)
-signal_bloodrf = reshape(
+#)
+#signal_bloodrf = reshape(
 	mean(abs.(mean(mag5rf[:, spins[2], :, :], 3)), 1), length(T2ps), length(RRs)
-)
+#)
 # Substracted
-signal_myoc6 = abs.(signal_myocrf .- signal_myocbb)
-signal_bloo6 = abs.(signal_bloodrf .- signal_bloodbb)
-diff_bloo_myoc6 = abs.(signal_bloo6 .- signal_myoc6)
+#signal_myoc6 = abs.(signal_myocrf .- signal_myocbb)
+#signal_bloo6 = abs.(signal_bloodrf .- signal_bloodbb)
+#diff_bloo_myoc6 = abs.(signal_bloo6 .- signal_myoc6)
 # Mean
-mean_myoc6 = mean(signal_myoc6, 2)
-mean_bloo6 = mean(signal_bloo6, 2)
-mean_diff6 = mean(diff_bloo_myoc6,2)
+#mean_myoc6 = mean(signal_myoc6, 2)
+#mean_bloo6 = mean(signal_bloo6, 2)
+#mean_diff6 = mean(diff_bloo_myoc6,2)
 # Std
-std_myoc6  = std(signal_myoc6, 2)
-std_bloo6  = std(signal_bloo6, 2)
-std_diff6 = std(diff_bloo_myoc6,2)
+#std_myoc6  = std(signal_myoc6, 2)
+#std_bloo6  = std(signal_bloo6, 2)
+#std_diff6 = std(diff_bloo_myoc6,2)
 # Plotting results
 # Mean
-s16 = scatter(;
+#s16 = scatter(;
 	x=T2ps,
 	y=mean_myoc6[:],
 	name="Substracted "*labels[1],
 	legendgroup=labels[1],
 	line=attr(; color=colors[1]),
-)
-s26 = scatter(;
+#)
+#s26 = scatter(;
 	x=T2ps,
 	y=mean_bloo6[:],
 	name="Substracted "*labels[2],
 	legendgroup=labels[2],
 	line=attr(; color=colors[2]),
-)
-s36 = scatter(;
+#)
+#s36 = scatter(;
 	x=T2ps,
 	y=mean_diff6[:],
-	name="|Sub. Blood - Sub. Carotid|",
-	legendgroup="|Blood-Carotid|",
+	name="|Sub. Blood - Sub. Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
-)
+#)
 # Std
-s46 = scatter(;
+#s46 = scatter(;
 	x=[T2ps; reverse(T2ps)],
 	y=[(mean_myoc6 .- std_myoc6)[:]; reverse((mean_myoc6 .+ std_myoc6)[:])],
 	name="Substracted "*labels[1],
@@ -1000,8 +1000,8 @@ s46 = scatter(;
 	fillcolor="rgba(0,0,255,0.2)",
 	line=attr(; color="rgba(0,0,0,0)"),
 	hoverinfo="none"
-)
-s56 = scatter(;
+#)
+#s56 = scatter(;
 	x=[T2ps; reverse(T2ps)],
 	y=[(mean_bloo6 .- std_bloo6)[:]; reverse((mean_bloo6 .+ std_bloo6)[:])],
 	name="Substracted "*labels[2],
@@ -1011,33 +1011,33 @@ s56 = scatter(;
 	fillcolor="rgba(255,0,0,0.2)",
 	line=attr(; color="rgba(0,0,0,0)"),
 	hoverinfo="none"
-)
-s66 = scatter(;
+#)
+#s66 = scatter(;
 	x=[T2ps; reverse(T2ps)],
 	y=[(mean_diff6 .- std_diff6)[:]; reverse((mean_diff6 .+ std_diff6)[:])],
-	name="|Sub. Blood - Sub. Carotid|",legendgroup="|Blood-Carotid|",
+	name="|Sub. Blood - Sub. Muscle|",legendgroup="|Blood-Muscle|",
 	showlegend=false,
 	fill="toself",
 	fillcolor="rgba(255,0,255,0.2)",
 	line=attr(color="rgba(0,0,0,0)"),
 	hoverinfo="none"
-)
+#)
 # Plots
-fig6 = plot([s16, s26, s36, s46, s56, s66])
-relayout!(
-	fig6;
-	yaxis=attr(; title="Signal [a.u.]", tickmode="array"),
-	xaxis=attr(;
-		title="T2prep duration [deg]",
-		tickmode="array",
-		tickvals=[T2ps[1], 50, 70, T2ps[end]],
-		constrain="domain",
-	),
-	font=attr(; family="CMU Serif", size=16, scaleanchor="x", scaleratio=1),
-	yaxis_range=[0, 0.2],
-	xaxis_range=[T2ps[1], T2ps[end]],
-	width=600,
-	height=400,
-	hovermode="x unified",
-)
-fig6
+#fig6 = plot([s16, s26, s36, s46, s56, s66])
+#relayout!(
+	#fig6;
+	#yaxis=attr(; title="Signal [a.u.]", tickmode="array"),
+	#xaxis=attr(;
+		#title="T2prep duration [deg]",
+		#tickmode="array",
+		#tickvals=[T2ps[1], 50, 70, T2ps[end]],
+		#constrain="domain",
+	#),
+	#font=attr(; family="CMU Serif", size=16, scaleanchor="x", scaleratio=1),
+	#yaxis_range=[0, 0.2],
+	#xaxis_range=[T2ps[1], T2ps[end]],
+	#width=600,
+	#height=400,
+	#hovermode="x unified",
+#)
+#fig6
