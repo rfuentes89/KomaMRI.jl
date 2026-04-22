@@ -367,8 +367,8 @@ s2 = scatter(;
 s3 = scatter(;
 	x=FAs,
 	y=mean_diff[:],
-	name="|Blood-Caro|",
-	legendgroup="|Blood-Caro|",
+	name="|Blood-Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
 )
 # Std
@@ -397,7 +397,7 @@ s5 = scatter(;
 s6 = scatter(;
 	x=[FAs; reverse(FAs)],
 	y=[(mean_diff .- std_diff)[:]; reverse((mean_diff .+ std_diff)[:])],
-	name="|Blood-Caro|",legendgroup="|Blood-Caro|",
+	name="|Blood-Muscle|",legendgroup="|Blood-Muscle|",
 	showlegend=false,
 	fill="toself",
 	fillcolor="rgba(255,0,255,0.2)",
@@ -557,8 +557,8 @@ s23 = scatter(;
 s33 = scatter(;
 	x=T2ps,
 	y=mean_diff3[:],
-	name="|Blood-Caro|",
-	legendgroup="|Blood-Caro|",
+	name="|Blood-Muscle|",
+	legendgroup="|Blood-Muscle|",
 	line=attr(color=colors[3])
 )
 # Std
@@ -587,7 +587,7 @@ s53 = scatter(;
 s63 = scatter(;
 	x=[T2ps; reverse(T2ps)],
 	y=[(mean_diff3 .- std_diff3)[:]; reverse((mean_diff3 .+ std_diff3)[:])],
-	name="|Blood-Caro|",legendgroup="|Blood-Caro|",
+	name="|Blood-Muscle|",legendgroup="|Blood-Muscle|",
 	showlegend=false,
 	fill="toself",
 	fillcolor="rgba(255,0,255,0.2)",
@@ -668,8 +668,8 @@ begin
 	s3 = scatter(;
 		x=RRs .* 1000,
 		y=signal_1hb_diff[:],
-		name="|Blood-Caro|",
-		legendgroup="|Blood-Caro|",
+		name="|Blood-Muscle|",
+		legendgroup="|Blood-Muscle|",
 		line=attr(color=colors[4])
 	)
 	s4 = scatter(;
