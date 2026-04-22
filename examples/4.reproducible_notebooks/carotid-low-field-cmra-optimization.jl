@@ -191,7 +191,7 @@ phantom_T1 = plot(
 			colorscale=[
 				[0.0, "black"],
 				[183.0/maximum(obj.T1 .* 1e3), "green"],
-				[750.0/maximum(obj.T1 .* 1e3), "blue"],
+				[450.0/maximum(obj.T1 .* 1e3), "blue"],
 				[1122.0/maximum(obj.T1 .* 1e3), "red"],
 			],
 			cmin=0.0,
@@ -223,7 +223,7 @@ phantom_T2 = plot(
 			color=obj.T2 * 1e3,
 			colorscale=[
 				[0.0, "black"],
-				[90.0/maximum(obj.T2 .* 1e3), "blue"],
+				[54.0/maximum(obj.T2 .* 1e3), "blue"],
 				[93.0/maximum(obj.T2 .* 1e3), "green"],
 				[263.0/maximum(obj.T2 .* 1e3), "red"],
 			],
@@ -250,7 +250,7 @@ relayout!(
 [phantom_T1 phantom_T2]
 
     # Prep plots
-labs = ["Carotid", "Blood", "Fat"]
+labs = ["Muscle", "Blood", "Fat"]
 cols = ["blue", "red", "green"]
 spin_group = [(1:Niso)', (Niso+1:2Niso)', (2Niso+1:3Niso)']
 t = KomaMRICore.get_adc_sampling_times(seq)
@@ -326,7 +326,7 @@ mag3 = zeros(ComplexF64, im_segments, Niso*3, length(T2ps), length(RRs))
 end
 
 # Labels
-labels = ["Carotid", "Blood", "Fat (T₁=183 ms)", "Blood-Carotid"]
+labels = ["Muscle", "Blood", "Fat (T₁=183 ms)", "Blood-Muscle"]
 colors = ["blue", "red", "green", "purple"]
 spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))']
 mean(x, dim) = sum(x; dims=dim) / size(x, dim)
