@@ -203,8 +203,8 @@ end
 # ╔═╡ f57a2b6c-eb4c-45bd-8058-4a60b038925d
 
 function cardiac_phantom(off; off_fat=fat_freq)
-	myocard = Phantom(x=dx, ρ=0.6*ones(Niso), T1=750e-3*ones(Niso),
-								T2=90e-3*ones(Niso),    Δw=2π*off*ones(Niso))
+	myocard = Phantom(x=dx, ρ=0.6*ones(Niso), T1=450e-3*ones(Niso),
+								T2=55e-3*ones(Niso),    Δw=2π*off*ones(Niso))
 	blood =   Phantom(x=dx, ρ=0.7*ones(Niso), T1=1122e-3*ones(Niso),
 								T2=263e-3*ones(Niso),   Δw=2π*off*ones(Niso))
 	fat1 =    Phantom(x=dx, ρ=1.0*ones(Niso), T1=183e-3*ones(Niso),
@@ -418,7 +418,7 @@ end
 
 # Labels
 labels = ["Muscle", "Blood", "Fat (T₁=183 ms)"]
-colors = ["blue", "red", "purple"]
+colors = ["blue", "red", "green"]
 #spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))', ((3Niso + 1):(4Niso))']
 spins = [(1:Niso)', ((Niso + 1):(2Niso))', ((2Niso + 1):(3Niso))']
 mean(x, dim) = sum(x; dims=dim) / size(x, dim)

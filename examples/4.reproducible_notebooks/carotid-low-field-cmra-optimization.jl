@@ -25,12 +25,12 @@ TR = 6.27e-3             # 5.3 [ms] RF Low SAR
 TE = TR / 2 			# bSSFP condition
 iNAV_lines = 3          # FatSat-Acq delay: iNAV_lines * TR
 iNAV_flip_angle = 3.2   # 3.2 [deg]
-im_segments = 30        # Acquisitino window: im_segments * TR
+im_segments = 25        # Acquisitino window: im_segments * TR
 	# To be optimized
 im_flip_angle = 110    # 110 [deg]
 FatSat_flip_angle = 180 # 180 [deg]
 
-#t2p_50 = read_seq("examples/4.reproducible_notebooks/boost_055T_basico.seq") # Pulseq import
+#t2p_50 = read_seq("examples/4.reproducible_notebooks/MRA_VDCASPR.seq") # Pulseq import
 
 seq_params = (;
 	dummy_heart_beats,
@@ -152,8 +152,8 @@ function CMRA(
 end
 
 function cardiac_phantom(off; off_fat=fat_freq)
-	myocard = Phantom(x=dx, ρ=0.6*ones(Niso), T1=750e-3*ones(Niso),
-                               T2=90e-3*ones(Niso),    Δw=2π*off*ones(Niso))
+	myocard = Phantom(x=dx, ρ=0.6*ones(Niso), T1=450e-3*ones(Niso),
+                               T2=55e-3*ones(Niso),    Δw=2π*off*ones(Niso))
     blood =   Phantom(x=dx, ρ=0.7*ones(Niso), T1=1122e-3*ones(Niso),
                                T2=263e-3*ones(Niso),   Δw=2π*off*ones(Niso))
     fat1 =    Phantom(x=dx, ρ=1.0*ones(Niso), T1=183e-3*ones(Niso),
@@ -223,7 +223,7 @@ phantom_T2 = plot(
 			color=obj.T2 * 1e3,
 			colorscale=[
 				[0.0, "black"],
-				[54.0/maximum(obj.T2 .* 1e3), "blue"],
+				[55.0/maximum(obj.T2 .* 1e3), "blue"],
 				[93.0/maximum(obj.T2 .* 1e3), "green"],
 				[263.0/maximum(obj.T2 .* 1e3), "red"],
 			],
