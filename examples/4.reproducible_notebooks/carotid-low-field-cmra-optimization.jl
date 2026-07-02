@@ -25,7 +25,7 @@ TR = 6.27e-3             # 5.3 [ms] RF Low SAR
 TE = TR / 2 			# bSSFP condition
 iNAV_lines = 3          # FatSat-Acq delay: iNAV_lines * TR
 iNAV_flip_angle = 3.2   # 3.2 [deg]
-im_segments = 25        # Acquisitino window: im_segments * TR
+im_segments = 30        # Acquisitino window: im_segments * TR
 	# To be optimized
 im_flip_angle = 110    # 110 [deg]
 FatSat_flip_angle = 180 # 180 [deg]
