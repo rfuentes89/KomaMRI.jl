@@ -51,12 +51,12 @@ function export_2_mat_scanner(sys, matfolder; matfilename="scanner.mat")
                 "Gmax" => sys.Gmax,
                 "Smax" => sys.Smax,
                 "ADC_dt" => sys.ADC_Δt,
-                "seq_dt" => sys.seq_Δt,
+                "DUR_dt" => sys.DUR_Δt,
                 "GR_dt" => sys.GR_Δt,
                 "RF_dt" => sys.RF_Δt,
-                "RF_ring_down_T" => sys.RF_ring_down_T,
-                "RF_dead_time_T" => sys.RF_dead_time_T,
-                "ADC_dead_time_T" => sys.ADC_dead_time_T)
+                "RF_ring_down_time" => sys.RF_ring_down_time,
+                "RF_dead_time" => sys.RF_dead_time,
+                "ADC_dead_time" => sys.ADC_dead_time)
     matwrite(joinpath(matfolder, matfilename), Dict("scanner" => sys_dict))
 end
 
@@ -65,13 +65,8 @@ function export_2_mat_raw(raw_ismrmrd, matfolder; matfilename="raw.mat");
         dict_for_mat = Dict()
         dict_user_params = raw_ismrmrd.params["userParameters"]
         for (key, value) in dict_user_params
-            if key == "Δt_rf"
-                dict_for_mat["dt_rf"] = value
-            elseif key == "Δt"
-                dict_for_mat["dt_rf"] = value
-            else
-                dict_for_mat[key] = value
-            end
+            ascii_key = replace(key, "Δ" => "d") # MATLAB does not support non-ascii characters in variable names
+            dict_for_mat[ascii_key] = value
         end
         matwrite(joinpath(matfolder, "sim_params.mat"), dict_for_mat)
 

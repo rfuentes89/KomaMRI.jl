@@ -5,7 +5,6 @@ using Reexport
 @reexport using KomaMRICore
 @reexport using KomaMRIFiles
 @reexport using KomaMRIPlots
-import KomaMRICore: update_blink_window_progress!
 
 # GUI
 using Blink, Interact, AssetRegistry
@@ -23,7 +22,12 @@ using MRIReco
 #GUI
 include("ui/ExportMATFunctions.jl")
 include("ui/ExportUIFunctions.jl")
+include("callbacks/ui_progress_callback.jl")
 include("KomaUI.jl")
+include("KomaCLI.jl")
+@static if VERSION >= v"1.12"
+    include("KomaApp.jl")
+end
 
 # Export the UI and the observables
 export KomaUI

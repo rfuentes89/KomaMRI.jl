@@ -4,13 +4,9 @@
 </p>
 
 <div align="center">
- 
-![][julia-110] [![][gh-actions-komamri]][gh-actions-url] [![][buildkite-badge]][buildkite-url] [![][codecov-komamri]][codecov-url] [![][total-downloads-komamri]][downloads-komamri-url]
 
-[![][docr-img]][docr-url] [![][docd-img]][docd-url] [![][paper-img]][paper-url] 
-
-[![][OSI2-img]][OSI2-url]
-
+![][julia-110] [![][gh-actions-komamri]][gh-actions-url] [![][buildkite-badge]][buildkite-url] [![][codecov-komamri]][codecov-url] [![][total-downloads-komamri]][downloads-komamri-url]<br>
+[![][docr-img]][docr-url] [![][docd-img]][docd-url] [![][paper-img]][paper-url] [![][OSI2-img]][OSI2-url]
 </div>
  
 KomaMRI.jl is a Julia package for highly efficient ⚡ MRI simulations. KomaMRI was built from the ground up to be: easy to use, extensible, cross-platform, and powered by open-source community standards.
@@ -58,8 +54,10 @@ KomaMRI.jl is a Julia package for highly efficient ⚡ MRI simulations. KomaMRI 
 - [How to Contribute](#how-to-contribute)
 - [How to Cite](#how-to-cite)
 - [Tested compatibility](#tested-compatibility) 
+- [PkgEval](#pkgeval)
 
 ## News
+- **(23 Jul 2025)** KomaMRI.jl was presented at JuliaCon 2025. Video available [here](https://youtu.be/YO-nLLfV27A?si=Us3QySMK0l1ItCvY), and slides [here](https://github.com/cncastillo/KomaMRI_JuliaCon2025).
 - **(16 Jun 2025)** [KomaMRI v0.9.1](https://github.com/JuliaHealth/KomaMRI.jl/releases/tag/v0.9.1) has received a **perfect score** in the Open Source Imaging Initiative (OSI²) CAB Review 🥳! Read the full review report [here](https://gitlab.com/osiiev/cab/-/blob/main/review/projects/KomaMRI/v0.9.1/review_report.md).
 - **(1 Oct 2024)** [KomaMRI v0.9](https://github.com/JuliaHealth/KomaMRI.jl/releases/tag/v0.9.0): device-agnostic simulations, improved performance (**4-5x faster and 80x less memory**), distributed simulations, GPU benchmarking, mix-and-match motion definitions, improved dynamic phantom plotting, and a new phantom file format!
 - **(29 Aug 2024)** Our first GSoC student, Ryan Kierulf, presented his fantastic work at the JuliaHealth monthly meeting 🥳! (presentation available [here](https://www.youtube.com/watch?v=R6Z20G0J4bM)) More info in the docs: [GPU Parallelization](https://juliahealth.org/KomaMRI.jl/dev/explanation/7-gpu-explanation/), [Distributed Simulations](https://juliahealth.org/KomaMRI.jl/dev/how-to/4-run-distributed-simulations/) and [Ryan's JuliaHealth blog](https://juliahealth.org/JuliaHealthBlog/posts/ryan-gsoc/Ryan_GSOC.html)
@@ -104,10 +102,13 @@ To install, just **type** `] add KomaMRI` in the Julia REPL or copy-paste the fo
 
 ```julia
 pkg> add KomaMRI
-pkg> add CUDA     # Optional: Install desired GPU backend (CUDA, AMDGPU, Metal, or oneAPI)
+pkg> add CUDA     # Optional: Install desired GPU backend (CUDA, AMDGPU, Metal, or oneAPI (experimental))
+pkg> app add KomaMRI # Optional: Install the koma app (Julia 1.12+)
 
 ```
+
 For more information about installation instructions, refer to the section [Getting Started](https://JuliaHealth.github.io/KomaMRI.jl/dev/how-to/1-getting-started) of the documentation.
+
 ## First run
 KomaMRI.jl features a convenient GUI with predefined simulation inputs (i.e. `Sequence`, `Phantom`, and `Scanner`). To launch the GUI, use the following command:
 
@@ -119,7 +120,7 @@ KomaUI()
 Press the button that says "Simulate!" to do your first simulation :). Then, a notification will emerge telling you that the simulation was successful. In this notification, you can either select to (1) see the Raw Data or (2) to proceed with the reconstruction.
 
 > [!IMPORTANT]
-> Starting from **KomaMRI v0.9** we are using [package extensions](https://pkgdocs.julialang.org/v1/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)) to deal with GPU dependencies, meaning that to run simulations on the GPU, installing (`add CUDA/AMDGPU/Metal/oneAPI`) and loading (`using CUDA/AMDGPU/Metal/oneAPI`) the desired backend will be necessary (see [GPU Parallelization](https://JuliaHealth.github.io/KomaMRI.jl/dev/explanation/7-gpu-explanation) and [Tested compatibility](#tested-compatibility)).  
+> Starting from **KomaMRI v0.9** we are using [package extensions](https://pkgdocs.julialang.org/v1/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)) to deal with GPU dependencies, meaning that to run simulations on the GPU, installing (`add CUDA/AMDGPU/Metal/oneAPI (experimental)`) and loading (`using CUDA/AMDGPU/Metal/oneAPI`) the desired backend will be necessary (see [GPU Parallelization](https://JuliaHealth.github.io/KomaMRI.jl/dev/explanation/7-gpu-explanation) and [Tested compatibility](#tested-compatibility)).
 
 ## How to Contribute
 KomaMRI exists thanks to all our contributors:
@@ -143,23 +144,27 @@ If you use this package, please cite our paper.
          author = {Castillo-Passi, Carlos and Coronado, Ronal and Varela-Mattatall, Gabriel and Alberola-López, Carlos and Botnar, René and Irarrazaval, Pablo},
          title = {KomaMRI.jl: An open-source framework for general MRI simulations with GPU acceleration},
          journal = {Magnetic Resonance in Medicine},
+         volume = {90},
+         number = {1},
+         pages = {329-342},
          keywords = {Bloch equations, GPU, GUI, Julia, open source, simulation},
          doi = {https://doi.org/10.1002/mrm.29635},
          url = {https://onlinelibrary.wiley.com/doi/abs/10.1002/mrm.29635},
          eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/mrm.29635},
+         year = {2023}
 }
 ```
 
 ## Tested compatibility
 
-All parallel backends are tested on Linux (besides Apple silicon) using the latest stable release, Julia 1 (stable), and Julia 1.9 (compat). 
+CUDA, AMDGPU, and Metal are tested on Linux (besides Apple silicon) using the latest stable release, Julia 1 (stable), and Julia 1.10 (compat). oneAPI support is experimental and is not included in the status badges below.
 
 <div align="center">
 
-| KomaMRICore          | CPU                                 | GPU (Nvidia)                        | GPU (AMD)                        | GPU (Apple)                        | GPU (Intel)                        | 
-|:---------------------|:-----------------------------------:|:-----------------------------------:|:--------------------------------:|:----------------------------------:|:----------------------------------:|
-| Julia 1.10           | [![][cpu-compat]][buildkite-url]    | [![][nvidia-compat]][buildkite-url] | [![][amd-compat]][buildkite-url] | [![][apple-compat]][buildkite-url] | [![][intel-compat]][buildkite-url] |
-| Julia 1              | [![][cpu-stable]][buildkite-url]    | [![][nvidia-stable]][buildkite-url] | [![][amd-stable]][buildkite-url] | [![][apple-stable]][buildkite-url] | [![][intel-stable]][buildkite-url] |
+| KomaMRICore          | CPU                                 | GPU (Nvidia)                        | GPU (AMD)                        | GPU (Apple)                        |
+|:---------------------|:-----------------------------------:|:-----------------------------------:|:--------------------------------:|:----------------------------------:|
+| Julia 1.10           | [![][cpu-compat]][buildkite-url]    | [![][nvidia-compat]][buildkite-url] | [![][amd-compat]][buildkite-url] | [![][apple-compat]][buildkite-url] |
+| Julia 1              | [![][cpu-stable]][buildkite-url]    | [![][nvidia-stable]][buildkite-url] | [![][amd-stable]][buildkite-url] | [![][apple-stable]][buildkite-url] |
 
 </div>
 
@@ -179,6 +184,26 @@ Single-threaded compatibility is tested in all major operating systems (OS).
 </div>
 
 If you see any problem with this information, please let us know in a GitHub issue.
+
+## PkgEval
+
+PkgEval is Julia's automated package evaluation system. It periodically tests
+registered packages against Julia versions to catch ecosystem regressions before
+they reach users.
+
+The umbrella `KomaMRI` package is excluded here because it opens UI paths that
+PkgEval cannot display. The subpackages below are the useful PkgEval signal.
+
+<div align="center">
+
+| Package | PkgEval |
+|:--------|:--------|
+| KomaMRIBase | [![PkgEval][pkgeval-img-komabase]][pkgeval-url-komabase] |
+| KomaMRICore | [![PkgEval][pkgeval-img-komacore]][pkgeval-url-komacore] |
+| KomaMRIFiles | [![PkgEval][pkgeval-img-komafiles]][pkgeval-url-komafiles] |
+| KomaMRIPlots | [![PkgEval][pkgeval-img-komaplots]][pkgeval-url-komaplots] |
+
+</div>
 
 <!-- VARIABLES -->
 <!-- Julia compat -->
@@ -202,17 +227,14 @@ If you see any problem with this information, please let us know in a GitHub iss
 [docd-url]: https://juliahealth.github.io/KomaMRI.jl/dev/
 <!-- Buildkite -->
 [buildkite-badge]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master
-[cpu-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CPU%3A%20Run%20tests%20on%20v1
-[nvidia-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CUDA%3A%20Run%20tests%20on%20v1
-[amd-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=AMDGPU%3A%20Run%20tests%20on%20v1
-[apple-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=Metal%3A%20Run%20tests%20on%20v1
-[intel-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=oneAPI%3A%20Run%20tests%20on%20v1
-
-[cpu-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CPU%3A%20Run%20tests%20on%20v1.10
-[nvidia-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CUDA%3A%20Run%20tests%20on%20v1.10
-[amd-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=AMDGPU%3A%20Run%20tests%20on%20v1.10
-[apple-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=Metal%3A%20Run%20tests%20on%20v1.10
-[intel-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=oneAPI%3A%20Run%20tests%20on%20v1.10
+[cpu-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CPU%204T%20-%20Julia%201%20-%20Test
+[nvidia-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CUDA%20-%20Julia%201%20-%20Test
+[amd-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=AMDGPU%20-%20Julia%201%20-%20Test
+[apple-stable]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=Metal%20-%20Julia%201%20-%20Test
+[cpu-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CPU%204T%20-%20Julia%201.10%20-%20Test
+[nvidia-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=CUDA%20-%20Julia%201.10%20-%20Test
+[amd-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=AMDGPU%20-%20Julia%201.10%20-%20Test
+[apple-compat]: https://badge.buildkite.com/f3c2e589ac0c1310cda3c2092814e33ac9db15b4f103eb572b.svg?branch=master&step=Metal%20-%20Julia%201.10%20-%20Test
 
 [buildkite-url]: https://buildkite.com/julialang/komamri-dot-jl/builds
 <!-- CI -->
@@ -238,6 +260,15 @@ If you see any problem with this information, please let us know in a GitHub iss
 [codecov-komafiles]: https://codecov.io/gh/JuliaHealth/KomaMRI.jl/branch/master/graph/badge.svg?flag=files
 [codecov-komaplots]: https://codecov.io/gh/JuliaHealth/KomaMRI.jl/branch/master/graph/badge.svg?flag=plots
 [codecov-url]: https://codecov.io/gh/JuliaHealth/KomaMRI.jl
+<!-- PkgEval -->
+[pkgeval-img-komabase]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIBase.svg
+[pkgeval-url-komabase]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIBase.html
+[pkgeval-img-komacore]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRICore.svg
+[pkgeval-url-komacore]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRICore.html
+[pkgeval-img-komafiles]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIFiles.svg
+[pkgeval-url-komafiles]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIFiles.html
+[pkgeval-img-komaplots]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIPlots.svg
+[pkgeval-url-komaplots]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/K/KomaMRIPlots.html
 <!-- Paper -->
 [arXiv-img]: https://img.shields.io/badge/arXiv-2107.11000-blue.svg
 [paper-img]: https://img.shields.io/badge/doi-10.1002/mrm.29635-blue.svg

@@ -1,5 +1,8 @@
 const MIN_RISE_TIME = 1e-14
 
+next_time(t) = max(t + MIN_RISE_TIME, nextfloat(t))
+prev_time(t) = min(t - MIN_RISE_TIME, prevfloat(t))
+
 """
     array_of_ranges = kfoldperm(N, k; breaks=[])
 
@@ -91,7 +94,6 @@ This function returns non-uniform time points that are relevant in the sequence 
 """
 function get_variable_times(seq; Δt=1e-3, Δt_rf=1e-5, motion=NoMotion())
 	t = Float64[]
-	ϵ = MIN_RISE_TIME # Small Float64
 	T0 = get_block_start_times(seq)
 	for i = 1:length(seq)
         t_block = Float64[]
@@ -102,8 +104,8 @@ function get_variable_times(seq; Δt=1e-3, Δt_rf=1e-5, motion=NoMotion())
 			delay, T = y.delay, y.T
 			t1 = t0 + delay
 			t2 = t1 + sum(T)
-			rf0 = t0 + get_RF_center(y) #get_RF_center includes delays
-			taux = points_from_key_times([t1, t1 + ϵ, rf0, t2 - ϵ, t2]; dt=Δt_rf)
+			tc = t0 + delay + rf_center(y)
+			taux = points_from_key_times(sort([t1, next_time(t1), tc, prev_time(t2), t2]); dt=Δt_rf)
             append!(t_block, taux)
 		end
 		if is_GR_on(s)
@@ -112,8 +114,8 @@ function get_variable_times(seq; Δt=1e-3, Δt_rf=1e-5, motion=NoMotion())
 			if is_Gy_on(s) append!(active_gradients, s.GR.y) end
 			if is_Gz_on(s) append!(active_gradients, s.GR.z) end
 			for y = active_gradients
-				ts = times(y) .+ t0
-				taux = points_from_key_times([ts[1] + ϵ; ts; ts[end] - ϵ]; dt=Δt)
+				ts = _reseparate_closing_knot!(times(y) .+ t0)
+				taux = points_from_key_times([next_time(ts[1]); ts; prev_time(ts[end])]; dt=Δt)
                 append!(t_block, taux)
 			end
 		end
@@ -122,12 +124,14 @@ function get_variable_times(seq; Δt=1e-3, Δt_rf=1e-5, motion=NoMotion())
         end
         append!(t, t_block)
 	end
-	add_jump_times!(t, motion)
+	add_key_time_points!(t, motion)
+	# Ensure t is never empty and contains the start and end of the sequence
+	append!(t, [0.0, dur(seq)])
 	# Removing repeated points
 	sort!(unique!(t))
 	# Fixes a problem with ADC at the start and end of the seq
-	t0 = t[1]   - ϵ
-	tf = t[end] + ϵ
+	t0 = prev_time(t[1])
+	tf = next_time(t[end])
 	t = [t0; t; tf]
 	# Time difference
 	Δt = t[2:end] .- t[1:end-1]

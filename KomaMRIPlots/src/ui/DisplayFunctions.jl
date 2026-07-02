@@ -31,21 +31,18 @@ function theme_chooser(darkmode)
 end
 
 function generate_seq_time_layout_config(
-    title, width, height, range, slider, show_seq_blocks, darkmode; T0, label_to_show=0
+    title, width, height, range, slider, show_seq_blocks, darkmode; T0, label_to_show=0, non_label_count=8
     )
 
     num_labels = length(label_to_show)
-    # Assume non-label traces are first (e.g. 3 + 3O + 1)
-    # Let non_label_count be the number of non-label traces
-    # For dropdown, always show non-label traces, and only one label trace
-     # Add 'none' option to hide all label traces
+    # For dropdown, only update label traces, leave non-label traces unchanged
+    # PlotlyJS uses 0-based indices: label traces start at non_label_count (0-based)
+    label_indices = [i-1 for i in (non_label_count+1):(non_label_count + num_labels)]
     buttons = [
         attr(
             label = "Labels (none)",
             method = "restyle",
-            args = [
-                attr(visible = vcat([1,1,1,1,"legendonly","legendonly",1], fill(false, num_labels)))
-            ]
+            args = [attr(visible = fill(false, num_labels)), label_indices]
         )
     ]
     # Add one button per label fieldname (only one label trace visible at a time)
@@ -53,9 +50,7 @@ function generate_seq_time_layout_config(
         attr(
             label = string(sym),
             method = "restyle",
-            args = [
-                attr(visible = vcat([1,1,1,1,"legendonly","legendonly",1], [j == i for j in 1:num_labels]))
-            ]
+            args = [attr(visible = [j == i for j in 1:num_labels]), label_indices]
         ) for (i, sym) in enumerate(label_to_show)
     ])
 
@@ -199,6 +194,7 @@ Plots a sequence struct.
 - `range`: (`::Vector{Real}`, `=[]`) time range to be displayed initially
 - `title`: (`::String`, `=""`) plot title
 - `freq_in_phase`: (`::Bool`, `=true`) Include FM modulation in RF phase
+- `show_rf_frame`: (`::Bool`, `=false`) plot RF rotating-frame phase
 - `gl`: (`::Bool`, `=false`) use `PlotlyJS.scattergl` backend (faster)
 - `max_rf_samples`: (`::Integer`, `=100`) maximum number of RF samples
 - `show_adc`: (`::Bool`, `=false`) plot ADC samples with markers
@@ -228,6 +224,7 @@ function plot_seq(
     yaxis="y",
     showlegend=true,
     freq_in_phase=false,
+    show_rf_frame=false,
     # Performance related
     gl=false,
     max_rf_samples=100,
@@ -240,6 +237,10 @@ function plot_seq(
     usadc(x; ampl_edge=1.0) = show_adc || isempty(x) ? x : [ampl_edge * first(x); 1.0 * first(x); 1.0 * last(x); ampl_edge * last(x)]
     # Get the samples of the events in the sequence
     seq_samples = (get_samples(seq, i; freq_in_phase) for i in 1:length(seq))
+    # Get block start times
+    T0 = get_block_start_times(seq)
+    # Get center times
+    center_times = reduce(vcat,[is_RF_on(b) ? [T0[i] + b.RF[1].delay + b.RF[1].center] : [] for (i,b) in enumerate(seq)])
     gx = (
         A=reduce(vcat, [block.gx.A; Inf] for block in seq_samples),
         t=reduce(vcat, [block.gx.t; Inf] for block in seq_samples),
@@ -255,22 +256,36 @@ function plot_seq(
     rf = (
         A=reduce(vcat, [usrf(block.rf.A); Inf] for block in seq_samples),
         t=reduce(vcat, [usrf(block.rf.t); Inf] for block in seq_samples),
+        ct=center_times,
+        cA=abs.(KomaMRIBase.get_rfs(seq, center_times)[1]),
+        cϕ=angle.(KomaMRIBase.get_rfs(seq, center_times)[1])
     )
     Δf = (
         A=reduce(vcat, [usrf(block.Δf.A); Inf] for block in seq_samples),
         t=reduce(vcat, [usrf(block.Δf.t); Inf] for block in seq_samples),
     )
+    ψ = show_rf_frame ? (
+        A=reduce(vcat, [usrf(block.ψ.A); Inf] for block in seq_samples),
+        t=reduce(vcat, [usrf(block.ψ.t); Inf] for block in seq_samples),
+    ) : nothing
     adc = (
         A=reduce(vcat, [usadc(block.adc.A; ampl_edge=0.0); Inf] for block in seq_samples),
         t=reduce(vcat, [usadc(block.adc.t); Inf] for block in seq_samples),
     )
 
-    label = get_label(seq)
+    label = get_labels(seq)
+    isadc = is_ADC_on.(seq)
+    label_symbols = [
+        sym for sym in fieldnames(AdcLabels)
+        if any(j -> isadc[j] && !iszero(getfield(label[j], sym)), eachindex(label))
+    ]
 
     # Define general params and the vector of plots
     idx = ["Gx" "Gy" "Gz"]
     O = size(seq.RF, 1)
-    p = [scatter_fun() for _ in 1:(3 + 3O + 1 + length(label))]
+    rf_trace_count = 3 + (freq_in_phase ? 0 : 1) + (!freq_in_phase && show_rf_frame ? 1 : 0)
+    adc_idx = 3 + rf_trace_count * O + 1
+    p = [scatter_fun() for _ in 1:(adc_idx + length(label_symbols))]
 
     # For GRADs
     fgx = is_Gx_on(seq) ? 1.0 : Inf
@@ -313,11 +328,14 @@ function plot_seq(
     # For RFs
     frf = is_RF_on(seq) ? 1.0 : Inf
     for j in 1:O
-        rf_amp = abs.(rf.A[:, j])
-        rf_phase = angle.(rf.A[:, j])
-        rf_phase[rf_amp .== Inf] .= Inf # Avoid weird jumps
+        idx_rf = 3 + rf_trace_count * (j - 1)
+        rf_wave = rf.A[:, j]
+        is_real_rf = all(x -> isinf(x) || isapprox(imag(x), 0; atol=eps()), rf_wave)
+        rf_amp = is_real_rf ? real.(rf_wave) : abs.(rf_wave)
+        rf_phase = is_real_rf ? zero.(real.(rf_wave)) : angle.(rf_wave)
+        rf_phase[isinf.(rf_amp)] .= Inf # Avoid weird jumps
         # Plot RF
-        p[2j - 1 + 3] = scatter_fun(;
+        p[idx_rf + 1] = scatter_fun(;
             x=rf.t * 1e3,
             y=rf_amp * 1e6 * frf,
             name="|B1|_AM",
@@ -328,7 +346,7 @@ function plot_seq(
             showlegend=showlegend,
             marker=attr(; color="#AB63FA"),
         )
-        p[2j + 3] = scatter_fun(;
+        p[idx_rf + 2] = scatter_fun(;
             x=rf.t * 1e3,
             y=rf_phase * frf,
             text=ones(size(rf.t)),
@@ -341,27 +359,60 @@ function plot_seq(
             showlegend=showlegend,
             marker=attr(; color="#FFA15A"),
         )
+        center_idx = idx_rf + 3
         if !freq_in_phase
-            p[2j + 4] = scatter_fun(;
+            p[center_idx] = scatter_fun(;
                 x=Δf.t * 1e3,
                 y=Δf.A[:, j] * 1e-3 * frf,
                 text=ones(size(Δf.t)),
-                name="B1_FM",
-                hovertemplate="(%{x:.4f} ms, B1_FM: %{y:.4f} kHz)",
+                name="Δf_FM",
+                hovertemplate="(%{x:.4f} ms, Δf_FM: %{y:.4f} kHz)",
                 visible="legendonly",
                 xaxis=xaxis,
                 yaxis=yaxis,
-                legendgroup="B1_FM",
+                legendgroup="Δf_FM",
                 showlegend=showlegend,
                 marker=attr(; color="#AB63FA"),
                 line=attr(; dash="dot"),
             )
+            center_idx += 1
+            if show_rf_frame
+                p[center_idx] = scatter_fun(;
+                    x=ψ.t * 1e3,
+                    y=ψ.A[:, j] * frf,
+                    text=ones(size(ψ.t)),
+                    name="ψ_FM",
+                    hovertemplate="(%{x:.4f} ms, ψ_FM: %{y:.4f} rad)",
+                    visible="legendonly",
+                    xaxis=xaxis,
+                    yaxis=yaxis,
+                    legendgroup="ψ_FM",
+                    showlegend=showlegend,
+                    marker=attr(; color="#FF6692"),
+                    line=attr(; dash="dot"),
+                )
+                center_idx += 1
+            end
         end
+        p[center_idx] = scatter_fun(;
+            x=rf.ct * 1e3,
+            y=rf.cA * 1e6 * frf,
+            text=rf.cϕ,
+            name="RF_center",
+            hovertemplate="RF center: %{x:.4f} ms<br>|B1|: %{y:.2f} μT<br>∠B1: %{text:.2f} rad<extra></extra>",
+            visible="legendonly",
+            xaxis=xaxis,
+            yaxis=yaxis,
+            legendgroup="RF_center",
+            showlegend=showlegend,
+            mode="markers",
+            marker=attr(; color="#FF0000", symbol="x"),
+        )
     end
 
     # For ADCs
     fa = is_ADC_on(seq) ? 1.0 : Inf
-    p[3O + 3 + 1] = scatter_fun(;
+    p[adc_idx] = scatter_fun(;
         x=adc.t * 1e3,
         y=adc.A * fa,
         name="ADC",
@@ -379,41 +430,29 @@ function plot_seq(
     ############################
     bgcolor, text_color, plot_bgcolor, grid_color, sep_color = theme_chooser(darkmode)
   
-    isadc = is_ADC_on.(seq)
     d = [ seq[i].DUR[1] for i in eachindex(seq.DUR)]
     d2 = [0;d]
     dcum = cumsum(d2)
     t_center = dcum[1:end-1] + d/2
     t_center_adc = t_center[isadc]
 
-    label_symbol = fieldnames(AdcLabels)
-    count_label = 0
-    sym_vec=[]
-    #colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-    for sym in label_symbol
+    for (i, sym) in enumerate(label_symbols)
         lab_vec = [getfield(label[j],sym) for j in eachindex(label)]
         lab_adc = lab_vec[isadc]
 
-        if ~isempty(lab_adc)
-            if maximum(lab_adc) > 1
-                count_label = count_label + 1
-                push!(sym_vec,sym)
-                #color = colors[mod1(i, length(colors))]
-                p[3O + 3 + 1 + count_label] = scatter_fun(;
-                    x= t_center_adc * 1e3,
-                    y= lab_adc,
-                    name=string(sym),
-                    hovertemplate="(%{x:.4f} ms, %{y:i})",
-                    xaxis=xaxis,
-                    yaxis=yaxis,
-                    legendgroup=string(sym),
-                    showlegend=false,
-                    mode=("markers"),
-                    marker=attr(; color=sep_color, symbol="x"),
-                    visible=false,
-                )
-            end
-        end
+        p[adc_idx + i] = scatter_fun(;
+            x= t_center_adc * 1e3,
+            y= lab_adc,
+            name=string(sym),
+            hovertemplate="(%{x:.4f} ms, %{y:i})",
+            xaxis=xaxis,
+            yaxis=yaxis,
+            legendgroup=string(sym),
+            showlegend=false,
+            mode=("markers"),
+            marker=attr(; color=sep_color, symbol="x"),
+            visible=false,
+        )
     end
 
     ###############################
@@ -428,7 +467,8 @@ function plot_seq(
         show_seq_blocks,
         darkmode;
         T0=get_block_start_times(seq),
-        label_to_show = sym_vec
+        label_to_show = label_symbols,
+        non_label_count = adc_idx
     )
     return plot_koma(p, l; config)
 end
@@ -471,7 +511,6 @@ function plot_M0(
     darkmode=false,
     range=[],
     title="",
-    skip_rf=zeros(Bool, sum(is_RF_on.(seq))),
 )
     #Times
     t, Δt = KomaMRIBase.get_variable_times(seq; Δt=1)
@@ -479,8 +518,8 @@ function plot_M0(
     T0 = get_block_start_times(seq)
     #M0
     ts = t .+ Δt
-    rf_idx, rf_type = KomaMRIBase.get_RF_types(seq, t)
-    k, _ = KomaMRIBase.get_kspace(seq; Δt=1, skip_rf)
+    rf_idx, rf_types = KomaMRIBase.get_RF_types(seq, t)
+    k, _ = KomaMRIBase.get_kspace(seq; Δt=1)
     #plots M0
     p = [scatter() for j in 1:4]
     p[1] = scatter(;
@@ -509,11 +548,11 @@ function plot_M0(
     )
     p[4] = scatter(;
         x=t[rf_idx] * 1e3,
-        y=rf_type,
-        name="RFs",
+        y=t[rf_idx] * 0,
+        name="RF_center",
         marker=attr(; symbol="cross", size=8, color="orange"),
         mode="markers",
-        showlegend=false,
+        text=string.(rf_types)
     )
     #Layout and config
     l, config = generate_seq_time_layout_config(
@@ -560,7 +599,6 @@ function plot_M1(
     darkmode=false,
     range=[],
     title="",
-    skip_rf=zeros(Bool, sum(is_RF_on.(seq))),
 )
     #Times
     t, Δt = KomaMRIBase.get_variable_times(seq; Δt=1)
@@ -568,8 +606,8 @@ function plot_M1(
     T0 = get_block_start_times(seq)
     #M1
     ts = t .+ Δt
-    rf_idx, rf_type = KomaMRIBase.get_RF_types(seq, t)
-    k, _ = KomaMRIBase.get_M1(seq; Δt=1, skip_rf)
+    rf_idx, rf_types = KomaMRIBase.get_RF_types(seq, t)
+    k, _ = KomaMRIBase.get_M1(seq; Δt=1)
     #plots M1
     p = [scatter() for j in 1:4]
     p[1] = scatter(;
@@ -598,11 +636,11 @@ function plot_M1(
     )
     p[4] = scatter(;
         x=t[rf_idx] * 1e3,
-        y=rf_type,
-        name="RFs",
+        y=t[rf_idx] * 0,
+        name="RF_center",
         marker=attr(; symbol="cross", size=8, color="orange"),
         mode="markers",
-        showlegend=false,
+        text=string.(rf_types)
     )
     #Layout and config
     l, config = generate_seq_time_layout_config(
@@ -656,7 +694,7 @@ function plot_M2(
     T0 = get_block_start_times(seq)
     #M2
     ts = t .+ Δt
-    rf_idx, rf_type = KomaMRIBase.get_RF_types(seq, t)
+    rf_idx, rf_types = KomaMRIBase.get_RF_types(seq, t)
     k, _ = KomaMRIBase.get_M2(seq; Δt=1)
     #Plor M2
     p = [scatter() for j in 1:4]
@@ -686,11 +724,11 @@ function plot_M2(
     )
     p[4] = scatter(;
         x=t[rf_idx] * 1e3,
-        y=rf_type,
-        name="RFs",
+        y=t[rf_idx] * 0,
+        name="RF_center",
         marker=attr(; symbol="cross", size=8, color="orange"),
         mode="markers",
-        showlegend=false,
+        text=string.(rf_types)
     )
     #Layout and config
     l, config = generate_seq_time_layout_config(
@@ -943,7 +981,7 @@ function plot_image(
 end
 
 """
-    p = plot_kspace(seq::Sequence; width=nothing, height=nothing, darkmode=false)
+    p = plot_kspace(seq::Sequence; width=nothing, height=nothing, darkmode=false, view_2d=false)
 
 Plots the k-space of a Sequence struct.
 
@@ -954,6 +992,7 @@ Plots the k-space of a Sequence struct.
 - `width`: (`::Integer`, `=nothing`) plot width
 - `height`: (`::Integer`, `=nothing`) plot height
 - `darkmode`: (`::Bool`, `=false`) boolean to indicate whether to display darkmode style
+- `view_2d`: (`::Bool`, `=false`) boolean to indicate whether to use a 2D kx/ky plot
 
 # Returns
 - `p`: (`::PlotlyJS.SyncPlot`) plot of the k-space of the Sequence struct
@@ -967,7 +1006,7 @@ julia> seq = read_seq(seq_file)
 julia> plot_kspace(seq)
 ```
 """
-function plot_kspace(seq::Sequence; width=nothing, height=nothing, darkmode=false)
+function plot_kspace(seq::Sequence; width=nothing, height=nothing, darkmode=false, view_2d=false)
     bgcolor, text_color, plot_bgcolor, grid_color, sep_color = theme_chooser(darkmode)
     #Calculations of theoretical k-space
     kspace, kspace_adc = get_kspace(seq; Δt=1) #sim_params["Δt"])
@@ -991,93 +1030,145 @@ function plot_kspace(seq::Sequence; width=nothing, height=nothing, darkmode=fals
     dW = maximum(maxk .- mink; dims=2) * 0.3
     mink .-= dW
     maxk .+= dW
-    #Layout
-    l = Layout(;
-        paper_bgcolor=bgcolor,
-        scene=attr(;
+    modebar = attr(;
+        orientation="h",
+        yanchor="bottom",
+        xanchor="right",
+        y=1,
+        x=0,
+        bgcolor=bgcolor,
+        color=text_color,
+        activecolor=plot_bgcolor,
+    )
+    legend = attr(; orientation="h", yanchor="bottom", xanchor="left", y=1, x=0)
+    if view_2d
+        l = Layout(;
+            paper_bgcolor=bgcolor,
+            plot_bgcolor=plot_bgcolor,
             xaxis=attr(;
                 title="kx [m⁻¹]",
                 range=[mink[1], maxk[1]],
-                backgroundcolor=plot_bgcolor,
                 gridcolor=grid_color,
                 zerolinecolor=grid_color,
+                scaleanchor="y",
             ),
             yaxis=attr(;
                 title="ky [m⁻¹]",
                 range=[mink[2], maxk[2]],
-                backgroundcolor=plot_bgcolor,
                 gridcolor=grid_color,
                 zerolinecolor=grid_color,
+                scaleratio=1,
             ),
-            zaxis=attr(;
-                title="kz [m⁻¹]",
-                range=[mink[3], maxk[3]],
-                backgroundcolor=plot_bgcolor,
-                gridcolor=grid_color,
-                zerolinecolor=grid_color,
+            modebar,
+            legend,
+            font_color=text_color,
+            margin=attr(; t=0, l=0, r=0),
+        )
+        p = [
+            scattergl(;
+                x=kspace[:, 1],
+                y=kspace[:, 2],
+                mode="lines",
+                line=attr(; color=c),
+                name="Trajectory",
+                hoverinfo="skip",
             ),
-        ),
-        modebar=attr(;
-            orientation="h",
-            yanchor="bottom",
-            xanchor="right",
-            y=1,
-            x=0,
-            bgcolor=bgcolor,
-            color=text_color,
-            activecolor=plot_bgcolor,
-        ),
-        legend=attr(; orientation="h", yanchor="bottom", xanchor="left", y=1, x=0),
-        font_color=text_color,
-        scene_camera_eye=attr(; x=0, y=0, z=1.7),
-        scene_camera_up=attr(; x=0, y=1.0, z=0),
-        scene_aspectmode="cube",
-        margin=attr(; t=0, l=0, r=0),
-    )
-    if height !== nothing
-        l.height = height
-    end
-    if width !== nothing
-        l.width = width
-    end
-    #Plot
-    p = [scatter() for j in 1:3]
-    p[1] = scatter3d(;
-        x=kspace[:, 1],
-        y=kspace[:, 2],
-        z=kspace[:, 3],
-        mode="lines",
-        line=attr(; color=c),
-        name="Trajectory",
-        hoverinfo="skip",
-    )
-    p[2] = scatter3d(;
-        x=kspace_adc[:, 1],
-        y=kspace_adc[:, 2],
-        z=kspace_adc[:, 3],
-        text=round.(t_adc * 1e3, digits=3),
-        mode="markers",
-        line=attr(; color=c2),
-        marker=attr(; size=2),
-        name="ADC",
-        hovertemplate="kx: %{x:.1f} m⁻¹<br>ky: %{y:.1f} m⁻¹<br>kz: %{z:.1f} m⁻¹<br><b>t_acq</b>: %{text} ms<extra></extra>",
-    )
-    p[3] = scatter3d(;
-        x=[0], y=[0], z=[0], name="k=0", marker=attr(; symbol="cross", size=10, color="red")
-    )
-    config = PlotConfig(;
-        displaylogo=false,
-        toImageButtonOptions=attr(;
-            format="svg", # one of png, svg, jpeg, webp
-        ).fields,
-        modeBarButtonsToRemove=[
+            scattergl(;
+                x=kspace_adc[:, 1],
+                y=kspace_adc[:, 2],
+                text=round.(t_adc * 1e3, digits=3),
+                mode="markers",
+                marker=attr(; color=c2, size=4),
+                name="ADC",
+                hovertemplate="kx: %{x:.1f} m⁻¹<br>ky: %{y:.1f} m⁻¹<br><b>t_acq</b>: %{text} ms<extra></extra>",
+            ),
+            scattergl(;
+                x=[0], y=[0], mode="markers", name="k=0",
+                marker=attr(; symbol="cross", size=10, color="red"),
+            ),
+        ]
+        modebar_buttons = ["zoom", "pan", "resetScale2d", "autoScale2d"]
+    else
+        l = Layout(;
+            paper_bgcolor=bgcolor,
+            scene=attr(;
+                xaxis=attr(;
+                    title="kx [m⁻¹]",
+                    range=[mink[1], maxk[1]],
+                    backgroundcolor=plot_bgcolor,
+                    gridcolor=grid_color,
+                    zerolinecolor=grid_color,
+                ),
+                yaxis=attr(;
+                    title="ky [m⁻¹]",
+                    range=[mink[2], maxk[2]],
+                    backgroundcolor=plot_bgcolor,
+                    gridcolor=grid_color,
+                    zerolinecolor=grid_color,
+                ),
+                zaxis=attr(;
+                    title="kz [m⁻¹]",
+                    range=[mink[3], maxk[3]],
+                    backgroundcolor=plot_bgcolor,
+                    gridcolor=grid_color,
+                    zerolinecolor=grid_color,
+                ),
+            ),
+            modebar,
+            legend,
+            font_color=text_color,
+            scene_camera_eye=attr(; x=0, y=0, z=1.7),
+            scene_camera_up=attr(; x=0, y=1.0, z=0),
+            scene_aspectmode="cube",
+            margin=attr(; t=0, l=0, r=0),
+        )
+        p = [
+            scatter3d(;
+                x=kspace[:, 1],
+                y=kspace[:, 2],
+                z=kspace[:, 3],
+                mode="lines",
+                line=attr(; color=c),
+                name="Trajectory",
+                hoverinfo="skip",
+            ),
+            scatter3d(;
+                x=kspace_adc[:, 1],
+                y=kspace_adc[:, 2],
+                z=kspace_adc[:, 3],
+                text=round.(t_adc * 1e3, digits=3),
+                mode="markers",
+                line=attr(; color=c2),
+                marker=attr(; size=2),
+                name="ADC",
+                hovertemplate="kx: %{x:.1f} m⁻¹<br>ky: %{y:.1f} m⁻¹<br>kz: %{z:.1f} m⁻¹<br><b>t_acq</b>: %{text} ms<extra></extra>",
+            ),
+            scatter3d(;
+                x=[0], y=[0], z=[0], name="k=0",
+                marker=attr(; symbol="cross", size=10, color="red"),
+            ),
+        ]
+        modebar_buttons = [
             "zoom",
             "pan",
             "tableRotation",
             "resetCameraLastSave3d",
             "orbitRotation",
             "resetCameraDefault3d",
-    ],
+        ]
+    end
+    if height !== nothing
+        l.height = height
+    end
+    if width !== nothing
+        l.width = width
+    end
+    config = PlotConfig(;
+        displaylogo=false,
+        toImageButtonOptions=attr(;
+            format="svg", # one of png, svg, jpeg, webp
+        ).fields,
+        modeBarButtonsToRemove=modebar_buttons,
     )
     return plot_koma(p, l; config)
 end
@@ -1589,6 +1680,7 @@ Plots a sampled sequence struct.
 # Keywords
 - `sampling_params`: (`::Dict{String,Any}()`, `=KomaMRIBase.default_sampling_params()`) dictionary of
     sampling parameters
+- `show_rf_frame`: (`::Bool`, `=true`) plot RF rotating-frame phase
 
 # Returns
 - `p`: (`::PlotlyJS.SyncPlot`) plot of the sampled Sequence struct
@@ -1602,8 +1694,11 @@ julia> seq = read_seq(seq_file)
 julia> plot_seqd(seq)
 ```
 """
-function plot_seqd(seq::Sequence; sampling_params=KomaMRIBase.default_sampling_params())
+function plot_seqd(seq::Sequence; sampling_params=KomaMRIBase.default_sampling_params(), show_rf_frame=true)
     seqd = KomaMRIBase.discretize(seq; sampling_params)
+    is_real_rf = all(x -> isapprox(imag(x), 0; atol=eps()), seqd.B1)
+    B1 = is_real_rf ? real.(seqd.B1) : abs.(seqd.B1)
+    B1_phase = is_real_rf ? zero.(real.(seqd.B1)) : angle.(seqd.B1)
     Gx = scattergl(;
         x=seqd.t * 1e3,
         y=seqd.Gx * 1e3,
@@ -1627,15 +1722,15 @@ function plot_seqd(seq::Sequence; sampling_params=KomaMRIBase.default_sampling_p
     )
     B1_abs = scattergl(;
         x=seqd.t * 1e3,
-        y=abs.(seqd.B1 * 1e6),
-        name="|B1|",
+        y=B1 * 1e6,
+        name="|B1|_AM",
         mode="markers+lines",
         marker_symbol=:circle,
     )
     B1_angle = scattergl(;
         x=seqd.t * 1e3,
-        y=angle.(seqd.B1),
-        name="∠B1",
+        y=B1_phase,
+        name="∠B1_AM",
         mode="markers+lines",
         marker_symbol=:circle,
     )
@@ -1648,11 +1743,24 @@ function plot_seqd(seq::Sequence; sampling_params=KomaMRIBase.default_sampling_p
     )
     B1_Δf = scattergl(;
         x=seqd.t * 1e3,
-        y=abs.(seqd.Δf * 1e-3),
-        name="B1_Δf",
+        y=seqd.Δf * 1e-3,
+        name="Δf_FM",
         mode="markers+lines",
         marker_symbol=:circle,
         visible="legendonly",
     )
-    return plot_koma([Gx, Gy, Gz, B1_abs, B1_angle, ADC, B1_Δf])
+    p = [Gx, Gy, Gz, B1_abs, B1_angle, ADC, B1_Δf]
+    if show_rf_frame
+        push!(p, scattergl(;
+            x=seqd.t * 1e3,
+            y=seqd.ψ,
+            name="ψ_FM",
+            mode="markers+lines",
+            marker_symbol=:circle,
+            marker=attr(; color="#FF6692"),
+            line=attr(; color="#FF6692"),
+            visible="legendonly",
+        ))
+    end
+    return plot_koma(p)
 end

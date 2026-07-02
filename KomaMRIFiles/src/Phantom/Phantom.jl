@@ -43,14 +43,14 @@ function import_motion!(phantom_fields::Array, motion_group::HDF5.Group)
         motion = motion_group[key]
         motion_fields = []
         for name in keys(motion) # action, time, spins
-            import_motion_field!(motion_fields, motion, name)
+            import_motion_field!(motion_fields, motion, name, T)
         end
         push!(motion_array, Motion(; motion_fields...))
     end
     push!(phantom_fields, (:motion, MotionList(motion_array...)))
 end
 
-function import_motion_field!(motion_fields::Array, motion::HDF5.Group, name::String)
+function import_motion_field!(motion_fields::Array, motion::HDF5.Group, name::String, T::Type{<:Real})
     field_group = motion[name]
     type = read_attribute(field_group, "type")
 
@@ -58,16 +58,16 @@ function import_motion_field!(motion_fields::Array, motion::HDF5.Group, name::St
     get_subtype_strings(t::Type) = last.(split.(string.(get_subtypes(t::Type)), "."))
     
     subtype_strings = [reduce(vcat, get_subtype_strings.([
-        KomaMRIBase.SimpleAction,
-        KomaMRIBase.ArbitraryAction,
-        KomaMRIBase.AbstractSpinSpan
+        SimpleAction,
+        ArbitraryAction,
+        AbstractSpinSpan
     ])); "TimeCurve"] 
 
     subtype_vector = [reduce(vcat, get_subtypes.([
-        KomaMRIBase.SimpleAction,
-        KomaMRIBase.ArbitraryAction,
-        KomaMRIBase.AbstractSpinSpan
-    ])); KomaMRIBase.TimeCurve]
+        SimpleAction,
+        ArbitraryAction,
+        AbstractSpinSpan
+    ])); TimeCurve]
 
     motion_subfields = []
     for (i, subtype_string) in enumerate(subtype_strings)
@@ -76,7 +76,7 @@ function import_motion_field!(motion_fields::Array, motion::HDF5.Group, name::St
                 key = string(subname)
                 if !(key in ["t_start", "t_end"])
                     subfield_value = key in keys(field_group) ? read(field_group, key) : read_attribute(field_group, key)
-                    import_motion_subfield!(motion_subfields, subfield_value, key)
+                    import_motion_subfield!(motion_subfields, subfield_value, key, T)
                 end
             end
             push!(motion_fields, (Symbol(name), subtype_vector[i](motion_subfields...)))
@@ -84,16 +84,18 @@ function import_motion_field!(motion_fields::Array, motion::HDF5.Group, name::St
     end
 end
 
-function import_motion_subfield!(motion_subfields::Array, subfield_value::Union{Real, Array}, key::String)
+function import_motion_subfield!(motion_subfields::Array, subfield_value::Union{Real, Array}, key::String, T::Type{<:Real})
     push!(motion_subfields, subfield_value)
     return nothing
 end
-function import_motion_subfield!(motion_subfields::Array, subfield_value::String, key::String)
+function import_motion_subfield!(motion_subfields::Array, subfield_value::String, key::String, T::Type{<:Real})
     if subfield_value in ["true", "false"]
         return push!(motion_subfields, subfield_value == "true" ? true : false)
-    end
-    if subfield_value == "nothing"
-        return push!(motion_subfields, nothing)
+    elseif subfield_value == "CenterOfMass"
+        return push!(motion_subfields, CenterOfMass())
+    elseif startswith(subfield_value, "(") && endswith(subfield_value, ")")
+        elements = split(subfield_value[2:end-1], ",")
+        return push!(motion_subfields, Tuple(parse.(T, strip.(elements))))
     end
     endpoints = parse.(Int, split(subfield_value, ":"))
     range = length(endpoints) == 3 ? (endpoints[1]:endpoints[2]:endpoints[3]) : (endpoints[1]:endpoints[2])
@@ -120,7 +122,7 @@ function write_phantom(
     HDF5.attributes(fid)["Version"] = string(pkgversion(KomaMRIFiles))
     HDF5.attributes(fid)["Name"] = obj.name
     HDF5.attributes(fid)["Ns"] = length(obj.x)
-    dims = KomaMRIBase.get_dims(obj)
+    dims = get_dims(obj)
     HDF5.attributes(fid)["Dims"] = sum(dims)
     # Positions
     pos = create_group(fid, "position")
@@ -142,7 +144,7 @@ end
 
 export_motion!(motion_group::HDF5.Group, motion::Motion) = export_motion!(motion_group, MotionList([motion]))
 function export_motion!(motion_group::HDF5.Group, motion_list::MotionList)
-    KomaMRIBase.sort_motions!(motion_list)
+    sort_motions!(motion_list)
     for (counter, m) in enumerate(motion_list.motions)
         motion = create_group(motion_group, "motion_$(counter)")
         for key in fieldnames(Motion) # action, time, spins
@@ -167,7 +169,7 @@ end
 function export_motion_subfield!(field_group::HDF5.Group, subfield::AbstractRange, subname::String)
     HDF5.attributes(field_group)[subname] = step(subfield) == 1 ? "$(first(subfield)):$(last(subfield))" : "$(first(subfield)):$(step(subfield)):$(last(subfield))"
 end
-function export_motion_subfield!(field_group::HDF5.Group, subfield::Bool, subname::String)
+function export_motion_subfield!(field_group::HDF5.Group, subfield::Union{Bool,Tuple}, subname::String)
     HDF5.attributes(field_group)[subname] = string(subfield)
 end
 function export_motion_subfield!(field_group::HDF5.Group, subfield::Array, subname::String)
@@ -176,6 +178,6 @@ end
 function export_motion_subfield!(field_group::HDF5.Group, subfield::BitMatrix, subname::String)
     field_group[subname] = Int.(subfield)
 end
-function export_motion_subfield!(field_group::HDF5.Group, subfield::Nothing, subname::String)
-    field_group[subname] = "nothing"
+function export_motion_subfield!(field_group::HDF5.Group, subfield::CenterOfMass, subname::String)
+    field_group[subname] = "CenterOfMass"
 end

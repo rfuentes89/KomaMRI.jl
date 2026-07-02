@@ -68,9 +68,14 @@ SpinRange
 
 ```@docs
 Sequence
+addblock!
+@addblock
+@addblocks
 dur
 get_block_start_times
 get_flip_angles
+check_timing
+check_hw_limits
 ```
 
 ### `Grad`
@@ -99,6 +104,14 @@ get_adc_phase_compensation
     
 ```@docs
 Delay
+Duration
+```
+
+### Extensions
+
+```@docs
+QuaternionRot
+apply_rotations
 ```
 
 ### Rotation matrices
@@ -139,6 +152,10 @@ get_samples
 times
 ampls
 freqs
+freq_times
+dwell
+delay
+rf_center
 ```
 
 ### Other functions
@@ -147,6 +164,7 @@ freqs
 trapz
 cumtrapz
 kfoldperm
+to_SI
 ```
 
 ## Sequence Building Blocks (SBB)
@@ -159,4 +177,39 @@ PulseDesigner.EPI
 PulseDesigner.radial_base
 PulseDesigner.spiral_base
 PulseDesigner.EPI_example
+```
+
+### PulseDesigner constructors
+
+```@docs
+PulseDesigner.make_trapezoid
+PulseDesigner.build_trapezoid
+PulseDesigner.make_arbitrary_grad
+PulseDesigner.build_arbitrary_grad
+PulseDesigner.make_extended_trapezoid
+PulseDesigner.build_extended_trapezoid
+PulseDesigner.make_extended_trapezoid_area
+PulseDesigner.build_extended_trapezoid_area
+PulseDesigner.make_block_pulse
+PulseDesigner.build_block_pulse
+PulseDesigner.make_sinc_pulse
+PulseDesigner.build_sinc_pulse
+PulseDesigner.make_arbitrary_rf
+PulseDesigner.build_arbitrary_rf
+PulseDesigner.make_gauss_pulse
+PulseDesigner.build_gauss_pulse
+PulseDesigner.make_adiabatic_pulse
+PulseDesigner.build_adiabatic_pulse
+PulseDesigner.make_label
+PulseDesigner.build_label
+PulseDesigner.make_rotation
+PulseDesigner.build_rotation
+PulseDesigner.make_trigger
+PulseDesigner.build_trigger
+PulseDesigner.make_digital_output_pulse
+PulseDesigner.build_digital_output_pulse
+PulseDesigner.make_delay
+PulseDesigner.build_delay
+PulseDesigner.make_adc
+PulseDesigner.build_adc
 ```

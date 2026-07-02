@@ -1,6 +1,9 @@
 #GUI tests
 @testitem "PlotlyJS" tags=[:plots] begin
+    import KomaMRIPlots: plot_backend!
     using KomaMRIBase, MRIFiles
+
+    plot_backend!("PlotlyJS")
 
     @testset "GUI_phantom" begin
         ph = brain_phantom2D()    #2D phantom
@@ -97,6 +100,17 @@
             @test true          #If the previous lines fail the test will fail
         end
 
+        @testset "plot_seq labels" begin
+            # Binary ADC labels from Pulseq extension chains must be selectable.
+            labeled = Sequence()
+            @addblock labeled += (ADC(1, 1e-6), LabelSet(0, "LIN"), LabelSet(1, "REV"))
+            @addblock labeled += (ADC(1, 1e-6), LabelSet(3, "LIN"), LabelSet(0, "REV"))
+            p = plot_seq(labeled)
+            trace_names = [get(trace.fields, :name, nothing) for trace in p.plot.data]
+            @test "LIN" in trace_names
+            @test "REV" in trace_names
+        end
+
         @testset "plot_kspace" begin
             #Plot k-space
             plot_kspace(seq; width=800, height=600) #Plotting the k-space
@@ -146,12 +160,12 @@
                 "Gmax" => sys.Gmax,
                 "Smax" => sys.Smax,
                 "ADC_dt" => sys.ADC_Δt,
-                "seq_dt" => sys.seq_Δt,
+                "DUR_dt" => sys.DUR_Δt,
                 "GR_dt" => sys.GR_Δt,
                 "RF_dt" => sys.RF_Δt,
-                "RF_ring_down_T" => sys.RF_ring_down_T,
-                "RF_dead_time_T" => sys.RF_dead_time_T,
-                "ADC_dead_time_T" => sys.ADC_dead_time_T)
+                "RF_ring_down_time" => sys.RF_ring_down_time,
+                "RF_dead_time" => sys.RF_dead_time,
+                "ADC_dead_time" => sys.ADC_dead_time)
         plot_dict(sys_dict)
         @test true
     end

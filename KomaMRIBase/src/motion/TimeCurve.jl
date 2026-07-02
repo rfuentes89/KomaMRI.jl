@@ -64,10 +64,11 @@ end
 check_unique(t) = true
 check_unique(t::Vector) = length(t) == length(unique(t))
 
-# Main Constructors
+# Main TimeCurve Constructors
 TimeCurve(t, t_unit, periodic, periods) = TimeCurve(t=t, t_unit=t_unit, periodic=periodic, periods=periods)
 TimeCurve(t, t_unit) = TimeCurve(t=t, t_unit=t_unit)
-# Custom constructors
+
+# Custom constructors: TimeRange & Periodic
 """
     timerange = TimeRange(t_start, t_end)
 
@@ -89,6 +90,9 @@ julia> timerange = TimeRange(t_start=0.6, t_end=1.4)
 """
 TimeRange(t_start::T, t_end::T) where T = TimeCurve(t=[t_start, t_end], t_unit=[zero(T), oneunit(T)])
 TimeRange(; t_start=0.0, t_end=1.0)     = TimeRange(t_start, t_end)
+
+# Define our own Periodic function to avoid extending Periodic from Interpolations.jl (required since Julia 1.12)
+function Periodic end 
 """
     periodic = Periodic(period, asymmetry)
 
@@ -109,30 +113,35 @@ julia> periodic = Periodic(period=1.0, asymmetry=0.2)
 ```
 ![Periodic](../assets/periodic.svg)
 """
-Periodic(period::T, asymmetry::T) where T = TimeCurve(t=[zero(T), period*asymmetry, period], t_unit=[zero(T), oneunit(T), zero(T)], periodic=true)
-Periodic(; period=1.0, asymmetry=0.5)     = Periodic(period, asymmetry)
+function Periodic(period::T, asymmetry::T) where T 
+    if asymmetry == oneunit(T)
+        return TimeCurve(t=[zero(T), period], t_unit=[zero(T), oneunit(T)], periodic=true)
+    elseif asymmetry == zero(T)
+        return TimeCurve(t=[zero(T), period], t_unit=[oneunit(T), zero(T)], periodic=true)
+    else
+        return TimeCurve(t=[zero(T), period*asymmetry, period], t_unit=[zero(T), oneunit(T), zero(T)], periodic=true)
+    end
+end
+Periodic(; period=1.0, asymmetry=0.5) = Periodic(period, asymmetry)
 
 """ Compare two TimeCurves """
 Base.:(==)(t1::TimeCurve, t2::TimeCurve) = reduce(&, [getfield(t1, field) == getfield(t2, field) for field in fieldnames(typeof(t1))])
 Base.:(≈)(t1::TimeCurve, t2::TimeCurve)  = reduce(&, [getfield(t1, field)  ≈ getfield(t2, field) for field in fieldnames(typeof(t1))])
 
 """ times & unit_time """
-# Although the implementation of these two functions when `per` is a vector is valid 
-# for all cases, it performs unnecessary and costly operations when `per` is a scalar. 
+times(tc::TimeCurve) = times(tc.t, tc.t_start, tc.t_end, tc.periods)
+# Although the implementation of these two functions when `periods` is a vector is valid 
+# for all cases, it performs unnecessary and costly operations when `periods` is a scalar.
 # Therefore, it has been decided to use method dispatch between these two cases.
-function times(t, per::Real)
-    return per .* t
+function times(t, t_start, t_end, periods::Real)
+    return t_start .+ periods .* (t .- t_start)
 end
-function times(t, per::AbstractVector)
-    tr      = repeat(t, length(per))
-    scale   = repeat(per, inner=[length(t)])
-    offsets = repeat(vcat(0, cumsum(per)[1:end-1]), inner=[length(t)])
-    tr     .= (tr .* scale) .+ offsets
-    return tr
+function times(t, t_start, t_end, periods::AbstractVector)
+    scale   = repeat(periods, inner=[length(t)])
+    offsets = repeat(cumsum(vcat(0, periods[1:end-1]*(t_end - t_start))), inner=[length(t)])
+    return t_start .+ ((repeat(t, length(periods)) .- t_start).* scale) .+ offsets
 end
-function unit_time(tq, t, t_unit, periodic, per::Real)
-    return interpolate_times(t .* per, t_unit, periodic, tq)
-end
-function unit_time(tq, t, t_unit, periodic, per::AbstractVector)
-    return interpolate_times(times(t, per), repeat(t_unit, length(per)), periodic, tq)
+
+function unit_time(tq, tc::TimeCurve)
+    return interpolate_times(times(tc), repeat(tc.t_unit, length(tc.periods)), tc.periodic, tq)
 end

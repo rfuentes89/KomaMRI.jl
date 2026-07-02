@@ -1,5 +1,10 @@
+struct CenterOfMass end
+Base.:(≈)(::CenterOfMass, ::CenterOfMass) = true
+Base.:(≈)(a::CenterOfMass, b) = false
+Base.:(≈)(a, b::CenterOfMass) = false
+
 @doc raw"""
-    r = Rotate(pitch, roll, yaw, center=nothing)
+    r = Rotate(pitch, roll, yaw, center=CenterOfMass())
  
 Rotate struct. It produces a rotation in the three axes: 
 x (pitch), y (roll), and z (yaw).
@@ -41,11 +46,11 @@ R &= R_z(\alpha) R_y(\beta) R_x(\gamma) \\
 - `pitch`: (`::Real`, `[º]`) rotation in x
 - `roll`: (`::Real`, `[º]`) rotation in y 
 - `yaw`: (`::Real`, `[º]`) rotation in z
-- `center`: (`::NTuple{3,Real}` or `nothing`) optional center of rotation, given in global coordinates. If `nothing` (default), the rotation is performed around the phantom’s center of mass.
+- `center`: (`::NTuple{3,Real}` or `::CenterOfMass`) optional center of rotation, given in global coordinates. Default is center of mass.
 
 # Notes
 - Rotations are applied around the point specified in `center`. If omitted, the rotation is centered at the phantom’s center of mass.
-- If `center` is not null, the rotation center is interpreted as a fixed point in space (absolute/global coordinates).
+- If `center` is not `::CenterOfMass`, the rotation center is interpreted as a fixed point in space (absolute/global coordinates).
 - This design ensures that consecutive or inverse rotations behave consistently and predictably, since the rotation center does not change with object transformations.
 
 # Returns
@@ -63,59 +68,54 @@ julia> r = Rotate(pitch=0.0, roll=45.0, yaw=0.0, center=(5e-3,0.0,0.0))
     pitch      :: T
     roll       :: T
     yaw        :: T
-    center     :: Union{Nothing,NTuple{3,T}} = nothing
+    center     :: Union{CenterOfMass,NTuple{3,T}} = CenterOfMass()
 end
 
-RotateX(pitch::T) where {T<:Real} = Rotate(pitch, zero(T), zero(T))
-RotateY(roll::T) where {T<:Real}  = Rotate(zero(T), roll, zero(T))
-RotateZ(yaw::T) where {T<:Real}   = Rotate(zero(T), zero(T), yaw)
+RotateX(pitch::T) where {T<:Real} = Rotate(pitch=pitch,   roll=zero(T), yaw=zero(T))
+RotateY(roll::T)  where {T<:Real} = Rotate(pitch=zero(T), roll=roll,    yaw=zero(T))
+RotateZ(yaw::T)   where {T<:Real} = Rotate(pitch=zero(T), roll=zero(T), yaw=yaw)
 
-function displacement_x!(ux, action::Rotate, x, y, z, t)   
-    # Not using sind and cosd functions until bug with oneAPI is solved: 
-    # https://github.com/JuliaGPU/oneAPI.jl/issues/65
-    α = t .* (action.yaw*π/180)
-    β = t .* (action.roll*π/180)
-    γ = t .* (action.pitch*π/180)
-    cx = isnothing(action.center) ? sum(x) / length(x) : action.center[1]
-    cy = isnothing(action.center) ? sum(y) / length(y) : action.center[2]
-    cz = isnothing(action.center) ? sum(z) / length(z) : action.center[3]
-    x0 = x .- cx
-    y0 = y .- cy
-    z0 = z .- cz
-    ux .= cos.(α) .* cos.(β) .* x0 +
-         (cos.(α) .* sin.(β) .* sin.(γ) .- sin.(α) .* cos.(γ)) .* y0 +
-         (cos.(α) .* sin.(β) .* cos.(γ) .+ sin.(α) .* sin.(γ)) .* z0 .+ cx .- x
+get_center(center::CenterOfMass, x, y, z) = (sum(x) / length(x), sum(y) / length(y), sum(z) / length(z))
+get_center(center::NTuple, x, y, z)       = center
+
+function displacement_x!(ux, action::Rotate, x, y, z, t)
+    cx, cy, cz = get_center(action.center, x, y, z)
+    α = deg2rad(action.yaw)
+    β = deg2rad(action.roll)
+    γ = deg2rad(action.pitch)
+    
+    @. ux =  cos(α * t) * cos(β * t) * (x - cx) +
+            (cos(α * t) * sin(β * t) * sin(γ * t) - sin(α * t) * cos(γ * t)) * (y - cy) +
+            (cos(α * t) * sin(β * t) * cos(γ * t) + sin(α * t) * sin(γ * t)) * (z - cz) + 
+            cx - x
+            
     return nothing
 end
 
 function displacement_y!(uy, action::Rotate, x, y, z, t)
-    α = t .* (action.yaw*π/180)
-    β = t .* (action.roll*π/180)
-    γ = t .* (action.pitch*π/180)
-    cx = isnothing(action.center) ? sum(x) / length(x) : action.center[1]
-    cy = isnothing(action.center) ? sum(y) / length(y) : action.center[2]
-    cz = isnothing(action.center) ? sum(z) / length(z) : action.center[3]
-    x0 = x .- cx
-    y0 = y .- cy
-    z0 = z .- cz
-    uy .= sin.(α) .* cos.(β) .* x0 +
-         (sin.(α) .* sin.(β) .* sin.(γ) .+ cos.(α) .* cos.(γ)) .* y0 +
-         (sin.(α) .* sin.(β) .* cos.(γ) .- cos.(α) .* sin.(γ)) .* z0 .+ cy .- y
+    cx, cy, cz = get_center(action.center, x, y, z)
+    α = deg2rad(action.yaw)
+    β = deg2rad(action.roll)
+    γ = deg2rad(action.pitch)
+    
+    @. uy =  sin(α * t) * cos(β * t) * (x - cx) +
+            (sin(α * t) * sin(β * t) * sin(γ * t) + cos(α * t) * cos(γ * t)) * (y - cy) +
+            (sin(α * t) * sin(β * t) * cos(γ * t) - cos(α * t) * sin(γ * t)) * (z - cz) + 
+            cy - y
+            
     return nothing
 end
 
 function displacement_z!(uz, action::Rotate, x, y, z, t)
-    α = t .* (action.yaw*π/180)
-    β = t .* (action.roll*π/180)
-    γ = t .* (action.pitch*π/180)
-    cx = isnothing(action.center) ? sum(x) / length(x) : action.center[1]
-    cy = isnothing(action.center) ? sum(y) / length(y) : action.center[2]
-    cz = isnothing(action.center) ? sum(z) / length(z) : action.center[3]
-    x0 = x .- cx
-    y0 = y .- cy
-    z0 = z .- cz
-    uz .=  -sin.(β) .* x0 + 
-            cos.(β) .* sin.(γ) .* y0 +
-            cos.(β) .* cos.(γ) .* z0 .+ cz .- z
+    cx, cy, cz = get_center(action.center, x, y, z)
+    α = deg2rad(action.yaw)
+    β = deg2rad(action.roll)
+    γ = deg2rad(action.pitch)
+    
+    @. uz = -sin(β * t) * (x - cx) + 
+             cos(β * t) * sin(γ * t) * (y - cy) +
+             cos(β * t) * cos(γ * t) * (z - cz) + 
+             cz - z
+            
     return nothing
 end
